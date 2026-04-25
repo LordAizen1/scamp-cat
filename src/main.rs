@@ -301,6 +301,13 @@ fn render_pet(pet: &mut Pet, screen: &Screen, stdout: &mut Stdout) {
 }
 
 fn main() -> anyhow::Result<()> {
+    // On Windows (especially when launched via double-click in Explorer),
+    // the ConHost window can come up without ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    // set on the output handle, so all our ANSI codes show up as raw text
+    // (← characters everywhere). Force-enable it before anything writes.
+    #[cfg(windows)]
+    let _ = enable_ansi_support::enable_ansi_support();
+
     let (cols, rows) = size().unwrap_or((100, 30));
 
     let renderer = detect_renderer();

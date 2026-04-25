@@ -1,6 +1,6 @@
 [package]
 name = "scamp"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A small animated cat that lives in your terminal."
 authors = ["LordAizen1"]
@@ -21,3 +21,6 @@ dirs = "5"
 rand = "0.8"
 image = { version = "0.25", default-features = false, features = ["png"] }
 icy_sixel = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+enable-ansi-support = "0.2"
