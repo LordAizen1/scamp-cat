@@ -705,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "scamp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -717,6 +717,7 @@ dependencies = [
  "rand 0.8.6",
  "vte",
  "which",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

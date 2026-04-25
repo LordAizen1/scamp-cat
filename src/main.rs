@@ -27,6 +27,55 @@ enum Renderer {
     HalfBlock,
 }
 
+// Detect "we were double-clicked from Explorer" by checking how many
+// processes are attached to the current console. A normal double-click
+// spawns a fresh ConHost window with just our process attached. When
+// scamp is run from an existing shell, both the shell and scamp are
+// attached, so the count is >= 2.
+#[cfg(windows)]
+fn try_relaunch_in_wt() {
+    use std::os::windows::process::CommandExt;
+    use windows_sys::Win32::System::Console::GetConsoleProcessList;
+
+    // Already inside Windows Terminal — nothing to do.
+    if std::env::var("WT_SESSION").is_ok() {
+        return;
+    }
+    // Explicit opt-out for users who want scamp to stay in their current terminal.
+    if std::env::var("SCAMP_NO_RELAUNCH").is_ok() {
+        return;
+    }
+
+    let console_processes = unsafe {
+        let mut buf = [0u32; 4];
+        GetConsoleProcessList(buf.as_mut_ptr(), buf.len() as u32)
+    };
+    // 0 means "no console" (e.g., piped). 1 means we own the console (double-click).
+    // 2 or more means we inherited a console from a parent shell.
+    if console_processes != 1 {
+        return;
+    }
+
+    let wt_path = match which::which("wt.exe") {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let our_path = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    // DETACHED_PROCESS so wt does not try to inherit our console handles.
+    const DETACHED_PROCESS: u32 = 0x00000008;
+    let spawned = std::process::Command::new(wt_path)
+        .arg(our_path)
+        .creation_flags(DETACHED_PROCESS)
+        .spawn();
+    if spawned.is_ok() {
+        std::process::exit(0);
+    }
+}
+
 fn detect_renderer() -> Renderer {
     if let Ok(forced) = std::env::var("SCAMP_RENDERER") {
         match forced.to_lowercase().as_str() {
@@ -304,9 +353,15 @@ fn main() -> anyhow::Result<()> {
     // On Windows (especially when launched via double-click in Explorer),
     // the ConHost window can come up without ENABLE_VIRTUAL_TERMINAL_PROCESSING
     // set on the output handle, so all our ANSI codes show up as raw text
-    // (← characters everywhere). Force-enable it before anything writes.
+    // (left-arrow characters everywhere). Force-enable it before anything writes.
     #[cfg(windows)]
     let _ = enable_ansi_support::enable_ansi_support();
+
+    // Try to relaunch into Windows Terminal on double-click for the sharp
+    // sixel experience. No-op if we're already in WT, in another terminal
+    // the user explicitly chose, or if wt.exe isn't installed.
+    #[cfg(windows)]
+    try_relaunch_in_wt();
 
     let (cols, rows) = size().unwrap_or((100, 30));
 
