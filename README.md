@@ -4,17 +4,26 @@ A small animated cat that lives in your terminal and keeps you company while you
 
 She wanders, sits, washes her paws, yawns, scratches, and sleeps in different poses. Walks left, right, up, and down with proper four-direction animations. Ignores you when she runs full-screen TUIs like vim or htop. Cleans up after herself when shell output scrolls past her.
 
+## Important: run scamp in Windows Terminal
+
+scamp is built around **sixel graphics** for sharp pixel-art rendering. Sixel works in:
+
+- **Windows Terminal** (recommended for Windows users; install free from the Microsoft Store, or `winget install Microsoft.WindowsTerminal`)
+- WezTerm, iTerm2, foot, kitty, contour, recent xterm
+
+In regular PowerShell windows, cmd.exe, and most IDE-integrated terminals (VS Code, Cursor, Antigravity), you get a **half-block fallback** that works but looks chunkier and less detailed. The cat is still a cat, just lower fidelity.
+
+If you can, open Windows Terminal first, then launch scamp inside it. The visual difference is significant.
+
 ## Install
 
 ### Windows (no Rust needed)
 
-Download `scamp.exe` from the [latest release](https://github.com/LordAizen1/scamp-cat/releases/latest), then in any terminal:
+Download `scamp.exe` from the [latest release](https://github.com/LordAizen1/scamp-cat/releases/latest), then run it inside Windows Terminal:
 
 ```
 scamp.exe
 ```
-
-Best in **Windows Terminal** (sixel renderer, sharp pixel-art cat). Works in regular PowerShell, cmd, and IDE-integrated terminals as well, with a chunkier half-block fallback.
 
 ### From source (any platform with Rust)
 
