@@ -1,5 +1,7 @@
 # scamp
 
+![scamp running in Windows Terminal: a small white cat sitting on an empty PowerShell prompt](assets/screenshot.png)
+
 A small animated cat that lives in your terminal and keeps you company while you work.
 
 She wanders, sits, washes her paws, yawns, scratches, and sleeps in different poses. Walks left, right, up, and down with proper four-direction animations. Ignores you when she runs full-screen TUIs like vim or htop. Cleans up after herself when shell output scrolls past her.
