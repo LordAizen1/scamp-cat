@@ -15,5 +15,4 @@ vte = "0.13"
 dirs = "5"
 rand = "0.8"
 image = { version = "0.25", default-features = false, features = ["png"] }
-asefile = "0.3"
 icy_sixel = "0.5"

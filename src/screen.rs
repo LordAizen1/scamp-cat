@@ -17,6 +17,12 @@ pub struct Screen {
     pub cells: Vec<Cell>,
     pub cursor_row: u16,
     pub cursor_col: u16,
+    pub scroll_count: u64,
+    // True while a full-screen TUI (vim, less, htop) has switched the
+    // terminal to its alt-screen buffer via DECSET 1049 / 1047 / 47.
+    // Sprite rendering pauses while this is set so we don't draw the cat
+    // over the TUI's UI.
+    pub alt_screen: bool,
 }
 
 impl Screen {
@@ -27,6 +33,8 @@ impl Screen {
             cells: vec![Cell::default(); (cols as usize) * (rows as usize)],
             cursor_row: 0,
             cursor_col: 0,
+            scroll_count: 0,
+            alt_screen: false,
         }
     }
 
@@ -50,6 +58,7 @@ impl Screen {
     }
 
     fn scroll_up(&mut self, n: u16) {
+        self.scroll_count = self.scroll_count.wrapping_add(n as u64);
         let cols = self.cols as usize;
         let rows = self.rows as usize;
         let n = (n as usize).min(rows);
@@ -112,7 +121,19 @@ impl Perform for Screen {
         }
     }
 
-    fn csi_dispatch(&mut self, params: &Params, _intermediates: &[u8], _ignore: bool, c: char) {
+    fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], _ignore: bool, c: char) {
+        // Private mode set/reset (CSI ? <Pn> h/l) — most relevant for us is
+        // the alt-screen toggle so we can pause rendering during vim/htop/less.
+        if intermediates == b"?" && (c == 'h' || c == 'l') {
+            for param in params.iter() {
+                if let Some(&n) = param.first() {
+                    if matches!(n, 1049 | 1047 | 47) {
+                        self.alt_screen = c == 'h';
+                    }
+                }
+            }
+            return;
+        }
         match c {
             'H' | 'f' => {
                 let mut it = params.iter();

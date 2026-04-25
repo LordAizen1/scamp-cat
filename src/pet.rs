@@ -1,9 +1,33 @@
 use rand::Rng;
 use std::time::{Duration, Instant};
 
-pub struct Anim {
-    pub sixels: Vec<String>,
-    pub durations_ms: Vec<u32>,
+use crate::half_block::HbFrame;
+
+pub enum Anim {
+    Sixel {
+        sixels: Vec<String>,
+        durations_ms: Vec<u32>,
+    },
+    HalfBlock {
+        frames: Vec<HbFrame>,
+        durations_ms: Vec<u32>,
+    },
+}
+
+impl Anim {
+    pub fn frame_count(&self) -> usize {
+        match self {
+            Anim::Sixel { sixels, .. } => sixels.len(),
+            Anim::HalfBlock { frames, .. } => frames.len(),
+        }
+    }
+    pub fn duration_ms(&self, frame: usize) -> u32 {
+        match self {
+            Anim::Sixel { durations_ms, .. } | Anim::HalfBlock { durations_ms, .. } => {
+                durations_ms[frame]
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -28,7 +52,6 @@ const ANIM_SLEEP_STRETCH: usize = 9;
 const ANIM_WASH_LIE: usize = 10;
 const ANIM_SCRATCH: usize = 11;
 
-// Random pools for idle / sleep variations.
 const IDLE_VARIANTS: &[usize] = &[ANIM_WASH, ANIM_YAWN, ANIM_WASH_LIE, ANIM_SCRATCH];
 const SLEEP_VARIANTS: &[usize] = &[
     ANIM_SLEEP_CURL,
@@ -37,7 +60,6 @@ const SLEEP_VARIANTS: &[usize] = &[
     ANIM_SLEEP_STRETCH,
 ];
 
-// After this many idle ticks (100ms each = 10 seconds), pet falls asleep.
 const IDLE_TO_SLEEP_TICKS: u32 = 100;
 
 pub struct Pet {
@@ -48,15 +70,21 @@ pub struct Pet {
     pause_ticks: u16,
     idle_ticks: u32,
     pub last_drawn: Option<(u16, u16, usize, usize)>,
+    pub rows_pub: u16,
+    pub cols_pub: u16,
+    // screen.scroll_count when render_pet last ran. Comparing tells us
+    // how many rows the sprite's pixels physically scrolled upward since
+    // last redraw — restoration extends upward to clean those ghost rows.
+    pub last_render_scroll: u64,
+    // Tracks the screen.alt_screen state we last saw so render_pet can
+    // detect the alt → normal transition and force a fresh stamp.
+    pub was_alt_screen: bool,
     rows: u16,
     cols: u16,
     pub cell_w: u16,
     pub cell_h: u16,
-    animations: Vec<Anim>,
+    pub animations: Vec<Anim>,
     state: State,
-    // Picked once each time the pet enters Idle, so multiple pauses
-    // give visible variation (sometimes wash, sometimes yawn; sometimes
-    // curl, sometimes loaf, sometimes head-down).
     active_idle_anim: usize,
     active_sleep_anim: usize,
     pub current_frame: usize,
@@ -64,6 +92,29 @@ pub struct Pet {
 }
 
 impl Pet {
+    pub fn resize(&mut self, new_rows: u16, new_cols: u16) {
+        self.rows = new_rows;
+        self.cols = new_cols;
+        self.rows_pub = new_rows;
+        self.cols_pub = new_cols;
+        let max_row = new_rows.saturating_sub(self.cell_h);
+        let max_col = new_cols.saturating_sub(self.cell_w);
+        if self.row > max_row {
+            self.row = max_row;
+        }
+        if self.col > max_col {
+            self.col = max_col;
+        }
+        if self.target_row > max_row {
+            self.target_row = max_row;
+        }
+        if self.target_col > max_col {
+            self.target_col = max_col;
+        }
+        // Old position is no longer trustworthy.
+        self.last_drawn = None;
+    }
+
     pub fn new(rows: u16, cols: u16, animations: Vec<Anim>, cell_w: u16, cell_h: u16) -> Self {
         assert_eq!(animations.len(), 12, "expected 12 animations (see main.rs ordering)");
         let start_col = cols.saturating_sub(cell_w);
@@ -76,6 +127,10 @@ impl Pet {
             pause_ticks: 0,
             idle_ticks: 0,
             last_drawn: None,
+            rows_pub: rows,
+            cols_pub: cols,
+            last_render_scroll: 0,
+            was_alt_screen: false,
             rows,
             cols,
             cell_w,
@@ -89,7 +144,7 @@ impl Pet {
         }
     }
 
-    fn anim_idx(&self) -> usize {
+    pub fn anim_index(&self) -> usize {
         match self.state {
             State::Idle => {
                 if self.idle_ticks >= IDLE_TO_SLEEP_TICKS {
@@ -105,12 +160,8 @@ impl Pet {
         }
     }
 
-    pub fn anim_index(&self) -> usize {
-        self.anim_idx()
-    }
-
-    pub fn current_sixel(&self) -> &str {
-        &self.animations[self.anim_idx()].sixels[self.current_frame]
+    pub fn current_anim(&self) -> &Anim {
+        &self.animations[self.anim_index()]
     }
 
     fn set_state(&mut self, s: State) {
@@ -128,19 +179,15 @@ impl Pet {
         if self.state == State::Idle {
             self.idle_ticks = self.idle_ticks.saturating_add(1);
         }
-        let cur_anim = self.anim_idx();
-        // Sleep is a different animation from idle but uses the same State,
-        // so set_state doesn't reset current_frame on the idle→sleep switch.
-        // Clamp here so we never index past the new animation's frame count.
-        let frame_count = self.animations[cur_anim].sixels.len();
+        let cur_anim = self.anim_index();
+        let frame_count = self.animations[cur_anim].frame_count();
         if self.current_frame >= frame_count {
             self.current_frame = 0;
             self.last_frame_change = Instant::now();
         }
-        let dur_ms = self.animations[cur_anim].durations_ms[self.current_frame].max(50) as u64;
+        let dur_ms = self.animations[cur_anim].duration_ms(self.current_frame).max(50) as u64;
         if self.last_frame_change.elapsed() >= Duration::from_millis(dur_ms) {
-            let n = self.animations[cur_anim].sixels.len();
-            self.current_frame = (self.current_frame + 1) % n;
+            self.current_frame = (self.current_frame + 1) % frame_count;
             self.last_frame_change = Instant::now();
         }
 
@@ -152,15 +199,12 @@ impl Pet {
         if self.row == self.target_row && self.col == self.target_col {
             self.set_state(State::Idle);
             let mut rng = rand::thread_rng();
-            // Refresh random idle / sleep variants for this pause.
             self.active_idle_anim = IDLE_VARIANTS[rng.gen_range(0..IDLE_VARIANTS.len())];
             self.active_sleep_anim = SLEEP_VARIANTS[rng.gen_range(0..SLEEP_VARIANTS.len())];
             let max_row = self.rows.saturating_sub(self.cell_h).max(1);
             let max_col = self.cols.saturating_sub(self.cell_w).max(1);
             self.target_row = rng.gen_range(0..max_row);
             self.target_col = rng.gen_range(0..max_col);
-            // Most pauses are short (2-6s); occasionally a long one (25-50s)
-            // that lets idle_ticks cross IDLE_TO_SLEEP_TICKS so she dozes off.
             self.pause_ticks = if rng.gen_bool(0.25) {
                 rng.gen_range(250..500)
             } else {
@@ -169,9 +213,6 @@ impl Pet {
             return;
         }
 
-        // Walk horizontal axis fully first, then vertical. Gives an L-shaped
-        // path with a single direction change per trip — looks deliberate
-        // instead of zigzagging.
         if self.col != self.target_col {
             if self.col < self.target_col {
                 self.set_state(State::WalkingRight);
