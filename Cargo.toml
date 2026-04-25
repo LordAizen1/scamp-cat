@@ -1,10 +1,15 @@
 [package]
 name = "scamp"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
-description = "A small creature that lives in your terminal."
-authors = ["mohdk"]
+description = "A small animated cat that lives in your terminal."
+authors = ["LordAizen1"]
 license = "MIT"
+repository = "https://github.com/LordAizen1/scamp-cat"
+homepage = "https://github.com/LordAizen1/scamp-cat"
+readme = "README.md"
+keywords = ["terminal", "pet", "cat", "tui", "sixel"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 portable-pty = "0.8"
