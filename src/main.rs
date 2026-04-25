@@ -391,7 +391,6 @@ fn main() -> anyhow::Result<()> {
 
     enable_raw_mode()?;
 
-    let pet_r = Arc::clone(&pet);
     let screen_r = Arc::clone(&screen);
     let stdout_r = Arc::clone(&stdout_lock);
     thread::spawn(move || {
@@ -401,25 +400,16 @@ fn main() -> anyhow::Result<()> {
             match reader.read(&mut rbuf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    let mut p = pet_r.lock().unwrap();
+                    // Hot path: only screen + stdout. Sprite rendering is
+                    // delegated to the tick thread (10fps) so heavy shell
+                    // output never gets blocked behind a render burst.
                     let mut s = screen_r.lock().unwrap();
                     let mut out = stdout_r.lock().unwrap();
-                    let scroll_before = s.scroll_count;
                     for &b in &rbuf[..n] {
                         parser.advance(&mut *s, b);
                     }
                     if out.write_all(&rbuf[..n]).is_err() {
                         break;
-                    }
-                    let scrolled = s.scroll_count != scroll_before;
-                    // Sixel: re-stamp eagerly so inline shell output never
-                    // leaves the sprite half-overwritten.
-                    // Half-block: only re-stamp on scroll (per-write redraw
-                    // is too flicker-y; render_pet handles ghost cleanup
-                    // via scroll_delta when scroll fires).
-                    let need_redraw = matches!(p.current_anim(), Anim::Sixel { .. }) || scrolled;
-                    if need_redraw {
-                        render_pet(&mut p, &s, &mut out);
                     }
                 }
             }
