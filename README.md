@@ -4,6 +4,8 @@ A small animated cat that lives in your terminal and keeps you company while you
 
 She wanders, sits, washes her paws, yawns, scratches, and sleeps in different poses. Walks left, right, up, and down with proper four-direction animations. Ignores you when she runs full-screen TUIs like vim or htop. Cleans up after herself when shell output scrolls past her.
 
+**Three different cats ship with scamp** (gray, ginger tabby, white) and one is picked at random every time you launch. You can pin one by setting the `SCAMP_CAT` env var (see [Configure](#configure) below).
+
 ## Important: run scamp in Windows Terminal
 
 scamp is built around **sixel graphics** for sharp pixel-art rendering. Sixel works in:
@@ -36,11 +38,14 @@ scamp
 
 Two environment variables.
 
-`SCAMP_CAT` picks a color (default: random per launch):
+`SCAMP_CAT` pins a specific cat color (default behavior is **random per launch** so each session feels a little different):
 ```
-$env:SCAMP_CAT="ginger"   # gray | ginger | white
+$env:SCAMP_CAT="gray"     # the dark-gray cat
+$env:SCAMP_CAT="ginger"   # the orange tabby
+$env:SCAMP_CAT="white"    # the white cat
 scamp
 ```
+Unset to go back to the random pick on each launch.
 
 `SCAMP_RENDERER` overrides the auto-detected renderer:
 ```
