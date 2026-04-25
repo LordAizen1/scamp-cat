@@ -1,0 +1,19 @@
+[package]
+name = "scamp"
+version = "0.0.1"
+edition = "2021"
+description = "A small creature that lives in your terminal."
+authors = ["mohdk"]
+license = "MIT"
+
+[dependencies]
+portable-pty = "0.8"
+crossterm = "0.27"
+anyhow = "1"
+which = "6"
+vte = "0.13"
+dirs = "5"
+rand = "0.8"
+image = { version = "0.25", default-features = false, features = ["png"] }
+asefile = "0.3"
+icy_sixel = "0.5"

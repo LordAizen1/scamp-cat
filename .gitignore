@@ -1,0 +1,13 @@
+/target
+.scamp/
+
+# Raw asset packs (only the curated ones in assets/sprites/ are tracked).
+14 feb/
+Free pack/
+
+# Debug artifacts from exploring the sprite sheet.
+assets/sprites/debug_*.png
+
+# OS junk.
+Thumbs.db
+.DS_Store
