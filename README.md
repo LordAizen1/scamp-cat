@@ -21,12 +21,32 @@ If you can, open Windows Terminal first, then launch scamp inside it. The visual
 
 ## Install
 
-### Windows (no Rust needed)
+Pre-built binaries for every major platform are on the [latest release](https://github.com/LordAizen1/scamp-cat/releases/latest) page. No Rust toolchain needed.
 
-Download `scamp.exe` from the [latest release](https://github.com/LordAizen1/scamp-cat/releases/latest), then run it inside Windows Terminal:
+### Windows
+
+Download `scamp-x86_64-windows.exe`, double-click. Opens in Windows Terminal automatically if installed, otherwise in ConHost with the half-block fallback.
+
+### Linux
 
 ```
-scamp.exe
+wget https://github.com/LordAizen1/scamp-cat/releases/latest/download/scamp-x86_64-linux
+chmod +x scamp-x86_64-linux
+./scamp-x86_64-linux
+```
+
+### macOS
+
+```
+# Apple Silicon (M1, M2, M3, M4)
+curl -LO https://github.com/LordAizen1/scamp-cat/releases/latest/download/scamp-aarch64-macos
+chmod +x scamp-aarch64-macos
+./scamp-aarch64-macos
+
+# Intel Mac
+curl -LO https://github.com/LordAizen1/scamp-cat/releases/latest/download/scamp-x86_64-macos
+chmod +x scamp-x86_64-macos
+./scamp-x86_64-macos
 ```
 
 ### From source (any platform with Rust)
@@ -55,7 +75,7 @@ $env:SCAMP_RENDERER="sixel"      # force pixel-perfect sixel
 $env:SCAMP_RENDERER="halfblock"  # force the half-block fallback
 ```
 
-By default scamp picks sixel when it detects a sixel-capable terminal (Windows Terminal, WezTerm, iTerm2, foot, kitty, contour) and half-block everywhere else.
+By default scamp picks sixel when it detects a sixel-capable terminal (Windows Terminal, WezTerm, iTerm2, Konsole, ghostty, foot, mlterm, contour) and half-block everywhere else.
 
 ## What's inside
 
@@ -65,16 +85,42 @@ By default scamp picks sixel when it detects a sixel-capable terminal (Windows T
 - Half-block character renderer for fallback compatibility
 - Atomic compositor: single buffered write per redraw, scroll-aware ghost cleanup, alt-screen pause, terminal resize handling
 
-## Compat notes
+## Terminal compatibility
 
-| Terminal                    | Renderer    | Notes                              |
-|-----------------------------|-------------|------------------------------------|
-| Windows Terminal            | sixel       | First-class, looks great           |
-| WezTerm, iTerm2, foot, kitty| sixel       | Detected via env vars              |
-| ConHost (default cmd / PS)  | half-block  | Fallback, smaller and chunkier     |
-| VS Code / Cursor / similar  | half-block  | Sixel possible if you enable it    |
+scamp looks her best in terminals that support sixel graphics. Terminals that don't get the half-block fallback (still cute, just chunkier).
 
-To get the cat to look its best in your IDE terminal, enable `terminal.integrated.enableImages` in settings, then `$env:SCAMP_RENDERER="sixel"` before launching.
+### Sharp pixel-art (sixel, auto-detected)
+
+| Platform | Terminal                                 |
+|----------|------------------------------------------|
+| Windows  | Windows Terminal                         |
+| macOS    | iTerm2, WezTerm, Ghostty                 |
+| Linux    | Konsole (KDE default), WezTerm, Ghostty, foot, mlterm, contour |
+
+### Chunky half-block fallback
+
+| Platform | Terminal                                                             |
+|----------|----------------------------------------------------------------------|
+| Windows  | ConHost (default cmd / PowerShell windows), VS Code / Cursor / Antigravity terminals |
+| macOS    | Terminal.app                                                         |
+| Linux    | gnome-terminal (Ubuntu / Fedora default), Alacritty, kitty, xfce4-terminal, terminator, urxvt, tilix |
+
+A note for Linux users: most popular default terminals (gnome-terminal especially) don't support sixel, so the chunky fallback is what you'll see out of the box on a fresh Ubuntu / Fedora install. To get the sharp version, install one of the supported terminals above (Konsole, WezTerm, Ghostty, etc.) and run scamp inside it.
+
+A note for kitty users: kitty has its own graphics protocol that's separate from sixel. scamp doesn't support kitty's protocol yet, so kitty users get the half-block fallback for now. Adding it is on the roadmap.
+
+### Forcing a renderer
+
+If you know your terminal supports sixel but auto-detect missed it, force it:
+```
+SCAMP_RENDERER=sixel scamp
+```
+Or force half-block if sixel renders weirdly:
+```
+SCAMP_RENDERER=halfblock scamp
+```
+
+For VS Code / Cursor / Antigravity terminal specifically: enable `terminal.integrated.enableImages` in your settings, then run with `SCAMP_RENDERER=sixel`.
 
 ## Credits
 
