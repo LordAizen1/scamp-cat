@@ -93,12 +93,20 @@ fn detect_renderer() -> Renderer {
     // `terminal.integrated.enableImages` is enabled, which is off by default
     // in many setups. Users can still opt in via SCAMP_RENDERER=sixel.
     if let Ok(tp) = std::env::var("TERM_PROGRAM") {
-        if matches!(tp.as_str(), "WezTerm" | "iTerm.app") {
+        if matches!(
+            tp.as_str(),
+            "WezTerm" | "iTerm.app" | "ghostty" | "Konsole" | "mlterm"
+        ) {
             return Renderer::Sixel;
         }
     }
     if let Ok(t) = std::env::var("TERM") {
-        if t.contains("kitty") || t.contains("foot") || t.contains("contour") {
+        if t.contains("kitty")
+            || t.contains("foot")
+            || t.contains("contour")
+            || t.contains("ghostty")
+            || t.contains("mlterm")
+        {
             return Renderer::Sixel;
         }
     }
