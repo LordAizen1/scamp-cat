@@ -115,22 +115,51 @@ pub fn crop_frames_to_union(groups: Vec<Vec<HbFrame>>) -> Vec<Vec<HbFrame>> {
 }
 
 // Append the half-block render of `frame` at terminal cell (row, col) into `buf`.
+//
+// Optimizations vs naive per-cell emit:
+//   - Reset SGR once at entry, then track prev fg/bg and only emit SGR when it
+//     changes (most adjacent cells in a sprite share colors).
+//   - Only emit a cursor-position escape on the first non-transparent cell of
+//     each row, or after a transparent gap / clipped cell — otherwise rely on
+//     the cursor advancing naturally as we write each half-block char.
 pub fn write_frame(buf: &mut String, frame: &HbFrame, row: u16, col: u16, max_rows: u16, max_cols: u16) {
+    buf.push_str("\x1b[0m");
+    let mut prev_fg: Option<(u8, u8, u8)> = None;
+    let mut prev_bg: Option<(u8, u8, u8)> = None;
     for cy in 0..frame.height_cells {
+        // None = cursor position unknown / next cell must reposition.
+        let mut next_expected_col: Option<u16> = None;
         for cx in 0..frame.width_cells {
             let cell = frame.cell_at(cy, cx);
-            if cell.transparent { continue; }
             let r = row + cy;
             let c = col + cx;
-            if r >= max_rows || c >= max_cols { continue; }
-            let _ = write!(buf, "\x1b[{};{}H\x1b[0m", r + 1, c + 1);
-            if let Some((br, bg, bb)) = cell.bg {
-                let _ = write!(buf, "\x1b[48;2;{};{};{}m", br, bg, bb);
+            if r >= max_rows || c >= max_cols {
+                next_expected_col = None;
+                continue;
             }
-            if let Some((rc, gc, bc)) = cell.fg {
-                let _ = write!(buf, "\x1b[38;2;{};{};{}m", rc, gc, bc);
+            if cell.transparent {
+                next_expected_col = None;
+                continue;
+            }
+            if next_expected_col != Some(c) {
+                let _ = write!(buf, "\x1b[{};{}H", r + 1, c + 1);
+            }
+            if cell.fg != prev_fg {
+                match cell.fg {
+                    Some((rc, gc, bc)) => { let _ = write!(buf, "\x1b[38;2;{};{};{}m", rc, gc, bc); }
+                    None => buf.push_str("\x1b[39m"),
+                }
+                prev_fg = cell.fg;
+            }
+            if cell.bg != prev_bg {
+                match cell.bg {
+                    Some((br, bg, bb)) => { let _ = write!(buf, "\x1b[48;2;{};{};{}m", br, bg, bb); }
+                    None => buf.push_str("\x1b[49m"),
+                }
+                prev_bg = cell.bg;
             }
             buf.push(cell.ch);
+            next_expected_col = Some(c + 1);
         }
     }
 }

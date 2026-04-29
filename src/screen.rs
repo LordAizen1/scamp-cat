@@ -63,19 +63,13 @@ impl Screen {
         let rows = self.rows as usize;
         let n = (n as usize).min(rows);
         if n == rows {
-            self.cells.iter_mut().for_each(|c| *c = Cell::default());
+            self.cells.fill(Cell::default());
             return;
         }
-        for r in 0..(rows - n) {
-            for c in 0..cols {
-                self.cells[r * cols + c] = self.cells[(r + n) * cols + c];
-            }
-        }
-        for r in (rows - n)..rows {
-            for c in 0..cols {
-                self.cells[r * cols + c] = Cell::default();
-            }
-        }
+        let shift = n * cols;
+        self.cells.copy_within(shift.., 0);
+        let tail_start = (rows - n) * cols;
+        self.cells[tail_start..].fill(Cell::default());
     }
 
     fn put_char(&mut self, ch: char) {

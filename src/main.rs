@@ -411,14 +411,25 @@ fn main() -> anyhow::Result<()> {
                     // Hot path: only screen + stdout. Sprite rendering is
                     // delegated to the tick thread (10fps) so heavy shell
                     // output never gets blocked behind a render burst.
-                    let mut s = screen_r.lock().unwrap();
-                    let mut out = stdout_r.lock().unwrap();
-                    for &b in &rbuf[..n] {
-                        parser.advance(&mut *s, b);
+                    // Split into two critical sections so the tick thread
+                    // can grab `screen` while we're flushing to stdout, and
+                    // vice versa.
+                    {
+                        let mut s = screen_r.lock().unwrap();
+                        for &b in &rbuf[..n] {
+                            parser.advance(&mut *s, b);
+                        }
                     }
+                    let mut out = stdout_r.lock().unwrap();
                     if out.write_all(&rbuf[..n]).is_err() {
                         break;
                     }
+                    // Stdout is a LineWriter — without an explicit flush, bytes
+                    // without a trailing '\n' (e.g. each keystroke the shell
+                    // echoes back) sit in the buffer until the next render
+                    // tick flushes. With sleeping-cat frame durations of 1s,
+                    // that means up to 1s of input lag.
+                    let _ = out.flush();
                 }
             }
         }
